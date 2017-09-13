@@ -1,2 +1,3 @@
-options/*.conf
-db/*
+options/busapi.conf
+db/ruoat.json
+db/bussit.json
