@@ -1,0 +1,79 @@
+*{
+	margin: 0;
+	list-style:none;
+}
+
+.slider{
+	/*overflow: hidden;*/
+	height: 800px;
+	margin:5px;
+}
+
+.slider figure div{
+	width: 66%;
+	float: left;
+}
+
+.slider figure {
+	position: relative;
+	padding-left: 10px;
+	height: 300%;
+	margin: 0;
+	left: 450px;
+	animation: 60s slideanimation infinite;
+	animation-timing-function: linear;
+	-webkit-transform: rotate(360deg);
+	transform: rotate(360deg);
+}
+
+@keyframes slideanimation {
+	0%{
+		bottom:50%;opacity:1;
+	}
+	99%{
+		bottom:300%;
+	}
+	100%{
+		opacity:1;bottom:300%;
+	}
+}
+.bussi {
+	font-size: 4em;
+}
+
+.meal {
+	font-size: 2em;
+}
+
+.nowplaying {
+	position: absolute;
+	bottom:0;
+	background-color: #111111;
+	width: 100%;
+}
+.nowplaying h3 {
+	color: #ffffff;
+}
+
+.restaurant{
+	/*display: inline;*/
+	float: left;
+}
+
+.mealcontent{
+	word-wrap: break-word;
+	max-width: 400px;
+}
+
+#clock{
+	font-size:70px;
+	position:absolute;
+	bottom:15px;
+	width:1px;
+	left:1700px;
+}
+
+body{
+	background-color: #222222;
+	color: #EEEEEE;
+}
