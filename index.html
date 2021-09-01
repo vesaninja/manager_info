@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <script type="text/javascript" src="jquery-3.2.1.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/index.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+
+
+    <script>
+      function startTime() {
+        var today = new Date();
+        var h = today.getHours();
+        var m = today.getMinutes();
+        m = addZero(m);
+        document.getElementById('clock').innerHTML = h + ":" + m;
+        var t = setTimeout(startTime, 1000);
+      }
+
+      function addZero(i) {
+        if (i < 10){
+          i = "0" + i;
+        }
+        return i;
+      }
+    </script>
+
+  </head>
+
+  <body onload="startTime()" background="img/tausta2.png">
+
+    <div class="slider">
+      <div id="Bussidiv" class="slide">
+          <h1 id="Bussiotsikko">Bussilinjat (TTY)</h1>
+
+          <ul id="Linjat" class="content"> </ul>
+      </div>
+    </div>
+
+    <div class="restaurants">
+      <h1 id="restaurants-title">Ruokalistat</h1>
+
+      <div id="main-content">
+        <p id="p1">Hello World!</p>
+
+        <h2 class="current-date"> sdf</h2>
+
+      </div>
+
+      <template id=restaurant-template>
+        <div class="menus">
+          <div class="menu-group">
+            <div class="menu">
+              <h2 class="menu-name">
+
+              </h2>
+              
+              <ul class="meal-list">
+                <li>
+                  <div class="meal">
+                    <h3 class="meal-name">
+
+                    </h3>
+                    
+                    <ul class="meal-contents">
+
+                    </ul>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <script src="lib/dot.min.js"></script>
+      <script src="lib/moment.min.js" charset="utf-8"></script>
+      <script src="lib/moment.fi.js" charset="utf-8"></script>
+      <script src="js/ruoka.js" charset="utf-8"></script>
+    </div>
+    <template id="productrow">
+      <tr>
+        <td class="record"></td>
+        <td></td>
+      </tr>
+    </template>
+
+    <div class="clockplace">
+      <h1 id="clock"></h1>
+    </div>
+
+    <div class="nowplaying">
+      <h3>Tähän tulee vielä hieno nowplaying-shitti. Stay tuned! </h3>
+    </div>
+
+  </body>
+</html>

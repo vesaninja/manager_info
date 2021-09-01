@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
@@ -21,3 +22,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+=======
+options/busapi.conf
+db/ruoat.json
+db/bussit.json
+>>>>>>> 32fee2d2f5f0226e756a05d0ee34c6237373f586

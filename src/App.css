@@ -1,5 +1,13 @@
 .App {
+  height: 100vh;
   text-align: center;
+  background-color: #4f5050;
+}
+
+.Card-padding {
+  background-color: #3165cc;
+  padding-left: 10%;
+  padding-right: 1500px;
 }
 
 .App-logo {
@@ -14,9 +22,8 @@
 }
 
 .App-header {
+  height: 10vh;
   background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
