@@ -41,10 +41,6 @@
 	font-size: 4em;
 }
 
-.meal {
-	font-size: 2em;
-}
-
 .nowplaying {
 	position: absolute;
 	bottom:0;
@@ -53,16 +49,6 @@
 }
 .nowplaying h3 {
 	color: #ffffff;
-}
-
-.restaurant{
-	/*display: inline;*/
-	float: left;
-}
-
-.mealcontent{
-	word-wrap: break-word;
-	max-width: 400px;
 }
 
 #clock{
