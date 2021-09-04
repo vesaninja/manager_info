@@ -3,16 +3,13 @@ from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, ForceRepl
     InlineKeyboardButton, KeyboardButton
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackContext,\
     CallbackQueryHandler
-import sys
-import time
-from pprint import pprint
-import json
-import os
 import random
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from urllib import parse
 import argparse
+import requests
+import datetime
 
 # Enable logging
 logging.basicConfig(
@@ -25,10 +22,6 @@ PHOTO_PATH = "kiltahuone.jpg"
 # TG-bot admins. These users have full access to every bot function!
 ADMINS = ["Vesaliina"]
 
-######################################################################################################################
-#  Start of bot commands.
-######################################################################################################################
-
 
 def add_to_queue_type_check(callback_data):
     """ Checks if CallbackQuery should be handled by add_to_queue handler. """
@@ -37,43 +30,65 @@ def add_to_queue_type_check(callback_data):
     return False
 
 
-def authenticate_type_check(callback_data):
-    """ Checks if CallbackQuery should be handled by add_to_queue handler. """
-    if type(callback_data) == dict and callback_data["type"] == "auth":
+def restaurant_type_check(callback_data):
+    if type(callback_data) == dict and callback_data["type"] == "restaurant":
         return True
     return False
 
 
-def volume_control_type_check(callback_data):
-    if type(callback_data) == dict and callback_data["type"] == "volume":
+def check_admin(update, context):
+    """ Check is user admin. """
+    is_admin = context.user_data.get("admin", False)
+    if update.effective_user.username in ADMINS or is_admin:
         return True
     return False
 
 
-def start_chat(update: Update, context: CallbackContext):
-    user = update.effective_user
+def create_command_keyboard(update, context, startup=False):
+    """ Create keyboard for spotify commands. """
+    if startup:
+        keyboard = [[KeyboardButton("/spotify"), KeyboardButton("/cam")],
+                    [KeyboardButton("/menu")]]
+    elif check_admin(update, context):
+        keyboard = [[KeyboardButton("/previous"), KeyboardButton("/play"), KeyboardButton("/next")],
+                    [KeyboardButton("/queue"), KeyboardButton("/pause"), KeyboardButton("/add")],
+                    [KeyboardButton("/restrict"), KeyboardButton("/token")]]
+    else:
+        keyboard = [[KeyboardButton("/previous"), KeyboardButton("/next")],
+                    [KeyboardButton("/play"), KeyboardButton("/pause")],
+                    [KeyboardButton("/queue"), KeyboardButton("/add")]]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+
+######################################################################################################################
+#  Start of bot commands.
+######################################################################################################################
+
+
+def start_chat(update, context):
+    """ Start a new chat with the bot. """
+    markup = create_command_keyboard(update, context, startup=True)
     update.message.reply_markdown_v2(
-        f"Hi {user.mention_markdown_v2()}, \n"
+        f"Hi {update.effective_user.mention_markdown_v2()}, \n"
         f"Welcome to the free 30 day trial of KiltaBot \n"
         f"Use command /help to list currently available commands \n",
-        reply_markup=ForceReply(selective=True),
+        reply_markup=markup
     )
 
 
-def help_command(update: Update, context: CallbackContext):
+def help_command(update, context):
     """Send a message when the command /help is issued."""
     update.message.reply_text("List of available commands: \n"
-                              "/help: Show this help message. \n"
-                              "/spotify: Open spotify command keyboard \n"
-                              "/play: Start playback. \n"
-                              "/pause: Pause playback. \n"
-                              "/skip: Skip to the the next song \n"
-                              "/previous: Return to the previous song \n"
-                              "/volume: Open volume control \n"
-                              "/add: Add song to queue. ")
+                              "/help - Show this help message. \n"
+                              "/spotify - Open spotify command keyboard. \n"
+                              "/admin - Register yourself as an admin. \n"
+                              "/add - Add song to queue. \n"
+                              "/queue - Print current queue. \n"
+                              "/menu - Print restaurant menus. \n"
+                              "/cam - Send image from kiltacam. ")
 
 
-def answer(update: Update, context: CallbackContext):
+def answer(update, context):
     """Answer to message that wasn't a command."""
     if any(phrase in update.message.text.lower() for phrase in ["moi", "hei", "hi", "hello", "helou", "moro", "mo"]):
         answers = ["Ju moii! ", "Noni terveppä terve"]
@@ -82,7 +97,7 @@ def answer(update: Update, context: CallbackContext):
     update.message.reply_text(random.choice(answers))
 
 
-def cam(update: Update, context: CallbackContext):
+def cam(update, context):
     """ Send a picture from guild room. """
     try:
         with open(PHOTO_PATH, 'rb') as photo:
@@ -90,13 +105,62 @@ def cam(update: Update, context: CallbackContext):
     except FileNotFoundError:
         update.message.reply_text("There seems to be something wrong with the camera :/")
 
-"""
-def create_command_keyboard(keyboard):
-    keyboard = [[KeyboardButton("/previous"), KeyboardButton("/play"), KeyboardButton("/next")],
-                [KeyboardButton("/volume"), KeyboardButton("/pause"), KeyboardButton("/add")]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    update.message.reply_text('Spotify controls:', reply_markup=reply_markup)
-"""
+
+def print_menu(update, context):
+    """ Print menu for the chosen restaurant. """
+    if context.args:
+        restaurant = context.args[0].upper()
+        if restaurant in RESTAURANTS:
+            RESTAURANTS[restaurant](update, context)
+            return
+    keyboard = [
+        [InlineKeyboardButton("Reaktori", callback_data={"type": "restaurant", "function": reaktori})],
+        [InlineKeyboardButton("Hertsi", callback_data={"type": "restaurant", "function": hertsi})],
+        [InlineKeyboardButton("Newton", callback_data={"type": "restaurant", "function": newton})]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text('Choose restaurant:', reply_markup=reply_markup)
+
+
+def restaurant_button(update, context):
+    query = update.callback_query
+    update.callback_query.data["function"](update, context)
+    query.edit_message_text(text="Menu: ")
+    context.drop_callback_data(query)
+
+
+def reaktori(update, context):
+    response = requests.get("https://www.foodandco.fi/modules/json/json/Index?costNumber=0812&language=en")
+    data = response.json()["MenusForDays"]
+    date = datetime.datetime.now().strftime("%y-%m-%d")
+    message = ""
+    for day in data:
+        if date in day["Date"]:
+            lunch_time = day["LunchTime"]
+            if not lunch_time:
+                message += "It looks like the restaurant is closed today. "
+                break
+            message += "Lunch time: {}\n".format(lunch_time)
+            for menu in day["SetMenus"]:
+                message += "Name: {} -- Price {}\n".format(menu["Name"], menu["Price"])
+                for component in menu["Components"]:
+                    message += "---{}\n".format(component)
+
+    context.bot.send_message(update.effective_message.chat_id, message)
+
+
+def hertsi(update, context):
+    message = "Restaurant is not supported yet. "
+    context.bot.send_message(update.effective_message.chat_id, message)
+
+
+def newton(update, context):
+    message = "Restaurant is not supported yet. "
+    context.bot.send_message(update.effective_message.chat_id, message)
+
+
+RESTAURANTS = {"REAKTORI": reaktori, "HERTSI": hertsi, "NEWTON": newton}
+
 
 class Spotify:
     def __init__(self, device_id, volume=70):
@@ -104,13 +168,16 @@ class Spotify:
         self.device_id = device_id
         self.spotify_api = self.spotify_setup()
         self.volume = volume
-        self.set_volume(self.volume)
         self.auth_token = "1234"
+        self.admin_token = "12345678"
+        self.queue = []
+        self.restricted_mode = False
 
-    def spotify_setup(self):
+    @staticmethod
+    def spotify_setup():
         """ Create spotify auth object. """
         # Read the api token from locally saved txt file. First line client id, second line secret token
-        scope = "user-modify-playback-state"
+        scope = "user-modify-playback-state user-read-currently-playing"
         with open("spotify.txt") as spotify_file:
             lines = spotify_file.readlines()
             client_id = lines[0].strip()
@@ -119,7 +186,7 @@ class Spotify:
                                                        redirect_uri="http://localhost:8888/callback/", scope=scope))
         return sp
 
-    def handle_replies(self, update: Update, context: CallbackContext):
+    def handle_replies(self, update, context):
         """ Get reply commands."""
         text = update.message.text.strip()
         reply_to = update.message.reply_to_message.text.strip()
@@ -128,27 +195,55 @@ class Spotify:
         if reply_to == "Search:":
             reply_markup = self.create_search_keyboard(text)
             update.message.reply_text('Results:', reply_markup=reply_markup)
+        if reply_to == "Insert admin code:":
+            self.compare_tokens(text, update, context, token_type="admin")
 
     def update_auth_token(self):
         """ Generate new auth string consisting of 4 numbers. """
         self.auth_token = str(random.randint(0, 9999)).zfill(4)
         logger.info(self.auth_token)
 
-    def new_token(self, update: Update, context: CallbackContext):
+    def new_token(self, update, context):
         """ Generate new auth token. """
-        self.update_auth_token()
+        if check_admin(update, context):
+            self.update_auth_token()
+            update.message.reply_text("New token: {}".format(self.auth_token))
+        else:
+            update.message.reply_text("This action requires admin rights!")
 
-    def compare_tokens(self, input_token, update, context):
+    def restrict_access(self, update, context):
+        """ Restrict access for non-admin users. """
+        if check_admin(update, context):
+            if self.restricted_mode:
+                update.message.reply_text("Restricted mode disabled. ")
+                self.restricted_mode = False
+            else:
+                update.message.reply_text("Restricted mode enabled. ")
+                self.restricted_mode = True
+        else:
+            update.message.reply_text("This action requires admin rights!")
+
+    def compare_tokens(self, input_token, update, context, token_type="auth"):
         """ Check if user token matches auth token and if so give the user spotify user rights. """
-        if input_token == self.auth_token:
+        if token_type == "auth" and input_token == self.auth_token:
             update.message.reply_text("Authentication successful; you can now use Spotify commands.")
             context.user_data["token"] = input_token
+            markup = create_command_keyboard(update, context)
+            update.message.reply_text('Spotify controls:', reply_markup=markup)
+        elif token_type == "admin" and input_token == self.admin_token:
+            update.message.reply_text("Authentication successful; you now have admin rights.")
+            context.user_data["admin"] = True
+            markup = create_command_keyboard(update, context)
+            update.message.reply_text('Spotify controls:', reply_markup=markup)
         else:
             update.message.reply_text("Wrong token. Please try again...")
 
-    def authenticate(self, update: Update, context: CallbackContext):
+    def authenticate(self, update, context):
         """ Authenticate . """
-        if context.args:
+        if self.check_auth(update, context):
+            markup = create_command_keyboard(update, context)
+            update.message.reply_text('Spotify controls:', reply_markup=markup)
+        elif context.args:
             input_token = context.args
             self.compare_tokens(input_token[0], update, context)
         else:
@@ -156,9 +251,12 @@ class Spotify:
 
     def check_auth(self, update, context):
         """ Check if user is authenticated to use spotify commands. """
-        if update.effective_user.username in ADMINS:
-            logger.info("This dude is Admin!")
+        if check_admin(update, context):
             return True
+        if self.restricted_mode:
+            update.message.reply_text("An admin has enabled restricted mode. "
+                                      "Spotify controls are temporarily disabled. ")
+            return False
         value = context.user_data.get("token", None)
         if value:
             if value == self.auth_token:
@@ -172,60 +270,44 @@ class Spotify:
                                   "Use command /spotify <auth token> to authenticate. ")
         return False
 
-    def start(self, update: Update, context: CallbackContext):
+    def admin(self, update, context):
+        """ Register user as an admin. """
+        if check_admin(update, context):
+            markup = create_command_keyboard(update, context)
+            update.message.reply_text('Spotify controls:', reply_markup=markup)
+            return
+        if context.args:
+            input_token = context.args
+            self.compare_tokens(input_token[0], update, context, token_type="admin")
+            markup = create_command_keyboard(update, context)
+            update.message.reply_text('Spotify controls:', reply_markup=markup)
+        else:
+            update.message.reply_text('Insert admin code: ',
+                                      reply_markup=ForceReply(input_field_placeholder="Insert admin code: "))
+
+    def start(self, update, context):
         """ Start spotify playback. """
         if not self.check_auth(update, context):
             return
-        self.spotify_api.start_playback(device_id=self.device_id)
+        self.spotify_api.start_playback()
 
-    def pause(self, update: Update, context: CallbackContext):
+    def pause(self, update, context):
         """ Pause spotify playback. """
         if not self.check_auth(update, context):
             return
-        self.spotify_api.pause_playback(device_id=self.device_id)
+        self.spotify_api.pause_playback()
 
-    def next_track(self, update: Update, context: CallbackContext):
+    def next_track(self, update, context):
         """ Skip the spotify playback to the next track. """
         if not self.check_auth(update, context):
             return
-        self.spotify_api.next_track(device_id=self.device_id)
+        self.spotify_api.next_track()
 
-    def previous_track(self, update: Update, context: CallbackContext):
+    def previous_track(self, update, context):
         """ Skip the spotify playback to the next track. """
         if not self.check_auth(update, context):
             return
-        self.spotify_api.previous_track(device_id=self.device_id)
-
-    def set_volume(self, action=None):
-        """ Update spotify volume. """
-        if action == "-" and self.volume > 0:
-            self.volume -= 10
-        if action == "+" and self.volume < 100:
-            self.volume += 10
-        self.spotify_api.volume(self.volume, device_id=self.device_id)
-
-    def volume_control(self, update: Update, context: CallbackContext):
-        """ Increase or decrease spotify volume. """
-        if not self.check_auth(update, context):
-            return
-        keyboard = [
-            [InlineKeyboardButton("-", callback_data={"type": "volume", "action": "-"}),
-             InlineKeyboardButton("+", callback_data={"type": "volume", "action": "+"})],
-            [InlineKeyboardButton("Done", callback_data={"type": "volume", "action": "done"})]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        update.message.reply_text('Set volume:', reply_markup=reply_markup)
-
-    def volume_control_button(self, update: Update, context: CallbackContext):
-        query = update.callback_query
-        if query.data["action"] == '-':
-            self.set_volume('-')
-        if query.data["action"] == '+':
-            self.set_volume('+')
-        if query.data["action"] == 'done':
-            query.answer()
-            query.edit_message_text(text="Done")
-            context.drop_callback_data(query)
+        self.spotify_api.previous_track()
 
     def create_search_keyboard(self, search_query, offset=0):
         """ Creates a keyboard for searching spotify songs. """
@@ -236,16 +318,18 @@ class Spotify:
             artist = result["artists"][0]["name"]
             song_name = result["name"]
             spotify_uri = result["uri"]
-            keyboard.append([InlineKeyboardButton("{}: {}".format(artist, song_name),
-                                                  callback_data={"type": "add_to_queue", "uri": spotify_uri})])
-        keyboard.append([InlineKeyboardButton("Next page", callback_data={"type": "add_to_queue", "uri": "next",
-                                                                          "search_query": search_query,
-                                                                          "offset": offset+5}),
+            pretty_name = "{} - {}".format(artist, song_name)
+            keyboard.append([InlineKeyboardButton(pretty_name,
+                                                  callback_data={"type": "add_to_queue", "uri": spotify_uri,
+                                                                 "name": pretty_name})])
+        keyboard.append([InlineKeyboardButton("Next page",
+                                              callback_data={"type": "add_to_queue", "uri": "next",
+                                                             "search_query": search_query, "offset": offset+5}),
                          InlineKeyboardButton("Eiku", callback_data={"type": "add_to_queue", "uri": "cancel"})])
         reply_markup = InlineKeyboardMarkup(keyboard)
         return reply_markup
 
-    def add_to_queue(self, update: Update, context: CallbackContext):
+    def add_to_queue(self, update, context):
         """ Add song to spotify queue. """
         if not self.check_auth(update, context):
             return
@@ -262,7 +346,7 @@ class Spotify:
             # update.message.reply_text('Usage: /add vauhti kiihtyy')
             update.message.reply_text('Search: ', reply_markup=ForceReply(input_field_placeholder="Search: "))
 
-    def add_to_queue_button(self, update: Update, context: CallbackContext):
+    def add_to_queue_button(self, update, context):
         """ Handles add_to_queue inline button presses. Adds the chosen song to the spotify play queue.  """
         if not self.check_auth(update, context):
             return
@@ -272,40 +356,56 @@ class Spotify:
         if "next" in query.data["uri"]:
             reply_markup = self.create_search_keyboard(query.data["search_query"], offset=query.data["offset"])
             query.edit_message_reply_markup(reply_markup=reply_markup)
-        elif "cancel" in query.data["uri"]:
-            query.edit_message_text(text="Cancelled. ")
         else:
-            self.spotify_api.add_to_queue(query.data["uri"])
-            query.edit_message_text(text="Added song to the queue. ")
-            context.drop_callback_data(query)
+            if "cancel" in query.data["uri"]:
+                query.edit_message_text(text="Cancelled. ")
+            else:
+                self.spotify_api.add_to_queue(query.data["uri"])
+                query.edit_message_text(text="Added song to the queue. ")
+                self.queue.append(query.data["name"])
+                context.drop_callback_data(query)
+            markup = create_command_keyboard(update, context)
+            context.bot.send_message(update.effective_message.chat_id, 'Spotify controls:', reply_markup=markup)
 
-    def search(self, update: Update, context: CallbackContext):
-        """ Query spotify for songs. """
-        if not self.check_auth(update, context):
-            return
+    def print_queue(self, update, context):
+        """ Print the current playback queue. """
+        message = ""
+
+        data = self.spotify_api.currently_playing()
+        current_artist = data["item"]["artists"][0]["name"]
+        current_song_name = data["item"]["name"]
+        current_pretty_name = "{} - {}".format(current_artist, current_song_name)
+        progress = int(int(data["progress_ms"]) / int(data["item"]["duration_ms"]) * 20)
+
+        message += "Currently playing:  {} \n".format(current_pretty_name)
+        message += "Progress:  |{}{}| \n".format('+' * progress, '-' * (20 - progress))
+        message += "Queue: \n"
+
         try:
-            if not context.args:
-                raise ValueError()
-            query = " ".join(context.args[0:])
-            results = self.spotify_api.search(q=parse.quote(query), type="track")
-            keyboard = []
+            index = self.queue.index(current_pretty_name)
+            self.queue = self.queue[index:]
             i = 1
-            for result in results["tracks"]["items"]:
-                artist = result["artists"][0]["name"]
-                song_name = result["name"]
-                spotify_uri = result["uri"]
-                keyboard.append([InlineKeyboardButton("{}: {}".format(artist, song_name), callback_data=str(i))])
+            for song in self.queue:
+                message += "  {}. {}\n".format(i, song)
                 i += 1
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            update.message.reply_text('Results:', reply_markup=reply_markup)
-
-        except (IndexError, ValueError):
-            update.message.reply_text('Usage: /search <query>')
+                if i >= 5:
+                    break
+        except ValueError:
+            message += "  Empty "
+        update.message.reply_text(message)
 
 
 ######################################################################################################################
 #  End of bot commands.
 ######################################################################################################################
+
+def error_callback(update, context):
+    """ Custom error handler. """
+    try:
+        raise context.error
+    except spotipy.exceptions.SpotifyException as error:
+        context.bot.send_message(update.effective_message.chat_id, error.msg)
+
 
 def define_commands(dispatcher, spotify):
     """ Define bot commands! """
@@ -313,27 +413,31 @@ def define_commands(dispatcher, spotify):
     dispatcher.add_handler(CommandHandler("help", help_command))
 
     dispatcher.add_handler(CommandHandler(["cam", "kiltacam", "snap"], cam))
+    dispatcher.add_handler(CommandHandler(["menu", "ruokalista"], print_menu))
+    dispatcher.add_handler(CallbackQueryHandler(restaurant_button, pattern=restaurant_type_check))
 
     if spotify:
         spotify_api = Spotify("393afc97e7cbc2502711db80685dbed507d63be0")
 
         dispatcher.add_handler(CommandHandler(["spotify"], spotify_api.authenticate))
-        dispatcher.add_handler(CommandHandler(["queue", "add"], spotify_api.add_to_queue))
+        dispatcher.add_handler(CommandHandler(["add"], spotify_api.add_to_queue))
+        dispatcher.add_handler(CommandHandler(["queue"], spotify_api.print_queue))
         dispatcher.add_handler(CommandHandler(["pause", "stop"], spotify_api.pause))
         dispatcher.add_handler(CommandHandler(["play", "unpause", "continue"], spotify_api.start))
         dispatcher.add_handler(CommandHandler(["next", "skip"], spotify_api.next_track))
         dispatcher.add_handler(CommandHandler(["previous"], spotify_api.previous_track))
-        dispatcher.add_handler(CommandHandler(["search", "find"], spotify_api.search))
-        dispatcher.add_handler(CommandHandler(["volume"], spotify_api.volume_control))
+
+        # Admin commands
+        dispatcher.add_handler(CommandHandler(["admin"], spotify_api.admin))
         dispatcher.add_handler(CommandHandler(["token"], spotify_api.new_token))
+        dispatcher.add_handler(CommandHandler(["restrict"], spotify_api.restrict_access))
 
         dispatcher.add_handler(MessageHandler(Filters.reply & Filters.text, spotify_api.handle_replies))
 
         dispatcher.add_handler(CallbackQueryHandler(spotify_api.add_to_queue_button,
                                                     pattern=add_to_queue_type_check))
-        dispatcher.add_handler(CallbackQueryHandler(spotify_api.volume_control_button,
-                                                    pattern=volume_control_type_check))
 
+    dispatcher.add_error_handler(error_callback)
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, answer))
 
 
@@ -353,7 +457,6 @@ if __name__ == '__main__':
     updater = Updater(token, arbitrary_callback_data=True, use_context=True)
 
     define_commands(updater.dispatcher, args.spotify)
-
     # Start the Bot
     updater.start_polling()
     # Run bot in background
