@@ -1,15 +1,15 @@
 import logging
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, ForceReply, InlineKeyboardMarkup,\
+from telegram import ReplyKeyboardMarkup, ForceReply, InlineKeyboardMarkup,\
     InlineKeyboardButton, KeyboardButton
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackContext,\
-    CallbackQueryHandler
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 import random
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-from urllib import parse
 import argparse
 import requests
 import datetime
+import os
+import sys
 
 # Enable logging
 logging.basicConfig(
@@ -17,10 +17,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Define system path to image from guildroom.
-PHOTO_PATH = "kiltahuone.jpg"
 # TG-bot admins. These users have full access to every bot function!
 ADMINS = ["Vesaliina"]
+# Path to media folder.
+MEDIA_PATH = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), "media")
+# Define system path to image from guildroom.
+PHOTO_PATH = "/home/pi/webcam/image.jpeg"
 
 
 def add_to_queue_type_check(callback_data):
@@ -52,12 +54,25 @@ def create_command_keyboard(update, context, startup=False):
     elif check_admin(update, context):
         keyboard = [[KeyboardButton("/previous"), KeyboardButton("/play"), KeyboardButton("/next")],
                     [KeyboardButton("/queue"), KeyboardButton("/pause"), KeyboardButton("/add")],
-                    [KeyboardButton("/restrict"), KeyboardButton("/token")]]
+                    [KeyboardButton("/restrict"), KeyboardButton("/token"), KeyboardButton("/back")]]
     else:
         keyboard = [[KeyboardButton("/previous"), KeyboardButton("/next")],
                     [KeyboardButton("/play"), KeyboardButton("/pause")],
-                    [KeyboardButton("/queue"), KeyboardButton("/add")]]
+                    [KeyboardButton("/queue"), KeyboardButton("/add")],
+                    [KeyboardButton("/close")]]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+
+def bot_send_media(update, path=MEDIA_PATH, media_type="voice", name=""):
+    """ Open and send media. """
+    try:
+        with open(os.path.join(path, name), 'rb') as media:
+            if media_type == "audio":
+                update.message.reply_audio(media)
+            if media_type == "voice":
+                update.message.reply_voice(media)
+    except FileNotFoundError:
+        return
 
 
 ######################################################################################################################
@@ -79,6 +94,7 @@ def start_chat(update, context):
 def help_command(update, context):
     """Send a message when the command /help is issued."""
     update.message.reply_text("List of available commands: \n"
+                              "/start - Open bot menu. \n"
                               "/help - Show this help message. \n"
                               "/spotify - Open spotify command keyboard. \n"
                               "/admin - Register yourself as an admin. \n"
@@ -99,11 +115,20 @@ def answer(update, context):
 
 def cam(update, context):
     """ Send a picture from guild room. """
-    try:
-        with open(PHOTO_PATH, 'rb') as photo:
-            update.message.reply_photo(photo)
-    except FileNotFoundError:
-        update.message.reply_text("There seems to be something wrong with the camera :/")
+    date = datetime.datetime.now()
+    if date.hour not in range(8, 21):
+        # It's night
+        bot_send_media(update, name="kamera_tila.ogg")
+    elif date.isoweekday() not in range(1, 6):
+        # It's weekend
+        bot_send_media(update, name="kamera_tila.ogg")
+    else:
+        # Send image
+        try:
+            with open(PHOTO_PATH, 'rb') as photo:
+                update.message.reply_photo(photo)
+        except FileNotFoundError:
+            update.message.reply_text("There seems to be something wrong with the camera :/")
 
 
 def print_menu(update, context):
@@ -123,6 +148,7 @@ def print_menu(update, context):
 
 
 def restaurant_button(update, context):
+    """ Handles the button actions of /menu command. """
     query = update.callback_query
     update.callback_query.data["function"](update, context)
     query.edit_message_text(text="Menu: ")
@@ -130,6 +156,7 @@ def restaurant_button(update, context):
 
 
 def reaktori(update, context):
+    """ Prints Reaktori's menu"""
     response = requests.get("https://www.foodandco.fi/modules/json/json/Index?costNumber=0812&language=en")
     data = response.json()["MenusForDays"]
     date = datetime.datetime.now().strftime("%y-%m-%d")
@@ -150,16 +177,24 @@ def reaktori(update, context):
 
 
 def hertsi(update, context):
+    """ Prints Hertsi's menu"""
     message = "Restaurant is not supported yet. "
     context.bot.send_message(update.effective_message.chat_id, message)
 
 
 def newton(update, context):
+    """ Prints Newton's menu"""
     message = "Restaurant is not supported yet. "
     context.bot.send_message(update.effective_message.chat_id, message)
 
 
 RESTAURANTS = {"REAKTORI": reaktori, "HERTSI": hertsi, "NEWTON": newton}
+
+
+def spotify_info(update, context):
+    """ Print error message when /spotify command is run, in --no-spotify mode. """
+    update.message.reply_text("I am currently running in \"no spotify mode\". "
+                              "Feature coming soon. Stay tuned. ")
 
 
 class Spotify:
@@ -284,6 +319,12 @@ class Spotify:
         else:
             update.message.reply_text('Insert admin code: ',
                                       reply_markup=ForceReply(input_field_placeholder="Insert admin code: "))
+
+    @staticmethod
+    def back(update, context):
+        """ Close spotify command view. """
+        markup = create_command_keyboard(update, context, startup=True)
+        update.message.reply_text('Spotify controls:', reply_markup=markup)
 
     def start(self, update, context):
         """ Start spotify playback. """
@@ -426,6 +467,7 @@ def define_commands(dispatcher, spotify):
         dispatcher.add_handler(CommandHandler(["play", "unpause", "continue"], spotify_api.start))
         dispatcher.add_handler(CommandHandler(["next", "skip"], spotify_api.next_track))
         dispatcher.add_handler(CommandHandler(["previous"], spotify_api.previous_track))
+        dispatcher.add_handler(CommandHandler(["back"], spotify_api.back))
 
         # Admin commands
         dispatcher.add_handler(CommandHandler(["admin"], spotify_api.admin))
@@ -433,11 +475,12 @@ def define_commands(dispatcher, spotify):
         dispatcher.add_handler(CommandHandler(["restrict"], spotify_api.restrict_access))
 
         dispatcher.add_handler(MessageHandler(Filters.reply & Filters.text, spotify_api.handle_replies))
-
         dispatcher.add_handler(CallbackQueryHandler(spotify_api.add_to_queue_button,
                                                     pattern=add_to_queue_type_check))
+        dispatcher.add_error_handler(error_callback)
+    else:
+        dispatcher.add_handler(CommandHandler(["spotify"], spotify_info))
 
-    dispatcher.add_error_handler(error_callback)
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, answer))
 
 
@@ -452,7 +495,8 @@ def parse_arguments():
 if __name__ == '__main__':
     args = parse_arguments()
     # Read the api token from locally saved txt file
-    with open("token.txt") as token_file:
+    script_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
+    with open(os.path.join(script_dir, "token.txt")) as token_file:
         token = token_file.read().strip()
     updater = Updater(token, arbitrary_callback_data=True, use_context=True)
 
