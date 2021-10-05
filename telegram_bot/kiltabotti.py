@@ -1,4 +1,6 @@
 import logging
+
+import telegram
 from telegram import ReplyKeyboardMarkup, ForceReply, InlineKeyboardMarkup,\
     InlineKeyboardButton, KeyboardButton
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
@@ -157,35 +159,61 @@ def restaurant_button(update, context):
 
 def reaktori(update, context):
     """ Prints Reaktori's menu"""
-    response = requests.get("https://www.foodandco.fi/modules/json/json/Index?costNumber=0812&language=en")
+    language = "fi"
+    url = "https://www.foodandco.fi/modules/json/json/Index?costNumber=0812&language={}".format(language)
+    response = requests.get(url)
     data = response.json()["MenusForDays"]
     date = datetime.datetime.now().strftime("%y-%m-%d")
     message = ""
     for day in data:
         if date in day["Date"]:
-            lunch_time = day["LunchTime"]
-            if not lunch_time:
+            if not day["LunchTime"]:
                 message += "It looks like the restaurant is closed today. "
                 break
-            message += "Lunch time: {}\n".format(lunch_time)
             for menu in day["SetMenus"]:
-                message += "Name: {} -- Price {}\n".format(menu["Name"], menu["Price"])
+                message += "\n<b>{}</b> -- <i>{}</i>\n".format(menu["Name"], menu["Price"])
                 for component in menu["Components"]:
-                    message += "---{}\n".format(component)
+                    message += "\t\t{}\n".format(component)
 
-    context.bot.send_message(update.effective_message.chat_id, message)
+    context.bot.send_message(update.effective_message.chat_id, message, parse_mode=telegram.ParseMode.HTML)
 
 
 def hertsi(update, context):
     """ Prints Hertsi's menu"""
-    message = "Restaurant is not supported yet. "
-    context.bot.send_message(update.effective_message.chat_id, message)
+    url = "https://www.sodexo.fi/en/ruokalistat/output/weekly_json/111"
+    response = requests.get(url)
+    data = response.json()["mealdates"]
+    current_weekday = datetime.datetime.today().strftime('%A')
+    message = ""
+    for day in data:
+        if current_weekday == day["date"]:
+            for menu_num in day["courses"]:
+                menu = day["courses"][menu_num]
+                message += "\n<b>{}</b> -- <i>{}</i>\n".format(menu["title_fi"], menu["price"])
+                for recipe_num in menu["recipes"]:
+                    if "name" in menu["recipes"][recipe_num]:
+                        message += "\t\t{}\n".format(menu["recipes"][recipe_num]["name"])
+    if not message:
+        message += "It looks like the restaurant is closed today. "
+
+    context.bot.send_message(update.effective_message.chat_id, message, parse_mode=telegram.ParseMode.HTML)
 
 
 def newton(update, context):
     """ Prints Newton's menu"""
-    message = "Restaurant is not supported yet. "
-    context.bot.send_message(update.effective_message.chat_id, message)
+    message = ""
+    date = datetime.datetime.now().strftime("%Y%m%d")
+    url = "https://fi.jamix.cloud/apps/menuservice/rest/haku/menu/12347/6/?lang=fi&date={}&date2={}".format(date, date)
+    response = requests.get(url)
+    data = response.json()[0]["menuTypes"]
+    for menu_name in data:
+        if menu_name["menuTypeName"] in ["Lounas", "Kasvis", "Konehuone"]:
+            meal_list = menu_name["menus"][0]["days"][0]["mealoptions"]
+            for meal in meal_list:
+                message += "\n<b>{}</b>\n".format(meal["name"], "price")
+                for recipe in meal["menuItems"]:
+                    message += "\t\t{}\n".format(recipe["name"])
+    context.bot.send_message(update.effective_message.chat_id, message, parse_mode=telegram.ParseMode.HTML)
 
 
 RESTAURANTS = {"REAKTORI": reaktori, "HERTSI": hertsi, "NEWTON": newton}
@@ -497,7 +525,7 @@ if __name__ == '__main__':
     # Read the api token from locally saved txt file
     script_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
     with open(os.path.join(script_dir, "token.txt")) as token_file:
-        token = token_file.read().strip()
+        token = token_file.readlines()[0].strip()
     updater = Updater(token, arbitrary_callback_data=True, use_context=True)
 
     define_commands(updater.dispatcher, args.spotify)
