@@ -61,7 +61,7 @@ def create_command_keyboard(update, context, startup=False):
         keyboard = [[KeyboardButton("/previous"), KeyboardButton("/next")],
                     [KeyboardButton("/play"), KeyboardButton("/pause")],
                     [KeyboardButton("/queue"), KeyboardButton("/add")],
-                    [KeyboardButton("/close")]]
+                    [KeyboardButton("/back")]]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
@@ -80,57 +80,6 @@ def bot_send_media(update, path=MEDIA_PATH, media_type="voice", name=""):
 ######################################################################################################################
 #  Start of bot commands.
 ######################################################################################################################
-
-
-def start_chat(update, context):
-    """ Start a new chat with the bot. """
-    markup = create_command_keyboard(update, context, startup=True)
-    update.message.reply_markdown_v2(
-        f"Hi {update.effective_user.mention_markdown_v2()}, \n"
-        f"Welcome to the free 30 day trial of KiltaBot \n"
-        f"Use command /help to list currently available commands \n",
-        reply_markup=markup
-    )
-
-
-def help_command(update, context):
-    """Send a message when the command /help is issued."""
-    update.message.reply_text("List of available commands: \n"
-                              "/start - Open bot menu. \n"
-                              "/help - Show this help message. \n"
-                              "/spotify - Open spotify command keyboard. \n"
-                              "/admin - Register yourself as an admin. \n"
-                              "/add - Add song to queue. \n"
-                              "/queue - Print current queue. \n"
-                              "/menu - Print restaurant menus. \n"
-                              "/cam - Send image from kiltacam. ")
-
-
-def answer(update, context):
-    """Answer to message that wasn't a command."""
-    if any(phrase in update.message.text.lower() for phrase in ["moi", "hei", "hi", "hello", "helou", "moro", "mo"]):
-        answers = ["Ju moii! ", "Noni terveppä terve"]
-    else:
-        answers = ["Ei se mua haittaa.", "Ei paasata siitä sen enempää. ", "Erittäin hyvin sanottu! "]
-    update.message.reply_text(random.choice(answers))
-
-
-def cam(update, context):
-    """ Send a picture from guild room. """
-    date = datetime.datetime.now()
-    if date.hour not in range(8, 21):
-        # It's night
-        bot_send_media(update, name="kamera_tila.ogg")
-    elif date.isoweekday() not in range(1, 6):
-        # It's weekend
-        bot_send_media(update, name="kamera_tila.ogg")
-    else:
-        # Send image
-        try:
-            with open(PHOTO_PATH, 'rb') as photo:
-                update.message.reply_photo(photo)
-        except FileNotFoundError:
-            update.message.reply_text("There seems to be something wrong with the camera :/")
 
 
 def print_menu(update, context):
@@ -219,6 +168,113 @@ def newton(update, context):
 RESTAURANTS = {"REAKTORI": reaktori, "HERTSI": hertsi, "NEWTON": newton}
 
 
+class BotController:
+    def __init__(self, spotify=True, idle=False):
+        """ Class for handling bot commands"""
+        self.spotify_enabled = spotify
+        self.updater = self.startup(idle)
+
+
+    def startup(self, idle):
+        """ Authenticate the bot and initialize the updater. """
+        # Read the api token from locally saved txt file
+        script_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
+        with open(os.path.join(script_dir, "auth/token.txt")) as token_file:
+            token = token_file.readlines()[0].strip()
+        updater = Updater(token, arbitrary_callback_data=True, use_context=True)
+
+        self.define_commands(updater.dispatcher)
+        updater.start_polling()
+        if idle:
+            updater.idle()
+        return updater
+
+    def define_commands(self, dispatcher):
+        """ Define bot commands! """
+        dispatcher.add_handler(CommandHandler("start", self.start_chat))
+        dispatcher.add_handler(CommandHandler("help", self.help_command))
+
+        dispatcher.add_handler(CommandHandler(["cam", "kiltacam", "snap"], self.cam))
+        dispatcher.add_handler(CommandHandler(["menu", "ruokalista"], print_menu))
+        dispatcher.add_handler(CallbackQueryHandler(restaurant_button, pattern=restaurant_type_check))
+
+        if self.spotify_enabled:
+            spotify_api = Spotify("393afc97e7cbc2502711db80685dbed507d63be0")
+
+            dispatcher.add_handler(CommandHandler(["spotify"], spotify_api.authenticate))
+            dispatcher.add_handler(CommandHandler(["add"], spotify_api.add_to_queue))
+            dispatcher.add_handler(CommandHandler(["queue"], spotify_api.print_queue))
+            dispatcher.add_handler(CommandHandler(["pause", "stop"], spotify_api.pause))
+            dispatcher.add_handler(CommandHandler(["play", "unpause", "continue"], spotify_api.start))
+            dispatcher.add_handler(CommandHandler(["next", "skip"], spotify_api.next_track))
+            dispatcher.add_handler(CommandHandler(["previous"], spotify_api.previous_track))
+            dispatcher.add_handler(CommandHandler(["back"], spotify_api.back))
+
+            # Admin commands
+            dispatcher.add_handler(CommandHandler(["admin"], spotify_api.admin))
+            dispatcher.add_handler(CommandHandler(["token"], spotify_api.new_token))
+            dispatcher.add_handler(CommandHandler(["restrict"], spotify_api.restrict_access))
+
+            dispatcher.add_handler(MessageHandler(Filters.reply & Filters.text, spotify_api.handle_replies))
+            dispatcher.add_handler(CallbackQueryHandler(spotify_api.add_to_queue_button,
+                                                        pattern=add_to_queue_type_check))
+            dispatcher.add_error_handler(error_callback)
+        else:
+            dispatcher.add_handler(CommandHandler(["spotify"], spotify_info))
+
+        dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, self.answer))
+
+    def start_chat(self, update, context):
+        """ Start a new chat with the bot. """
+        markup = create_command_keyboard(update, context, startup=True)
+        update.message.reply_markdown_v2(
+            f"Hi {update.effective_user.mention_markdown_v2()}, \n"
+            f"Welcome to the free 30 day trial of KiltaBot \n"
+            f"Use command /help to list currently available commands \n",
+            reply_markup=markup
+        )
+
+
+    def help_command(self, update, context):
+        """Send a message when the command /help is issued."""
+        update.message.reply_text("List of available commands: \n"
+                                  "/start - Open bot menu. \n"
+                                  "/help - Show this help message. \n"
+                                  "/spotify - Open spotify command keyboard. \n"
+                                  "/admin - Register yourself as an admin. \n"
+                                  "/add - Add song to queue. \n"
+                                  "/queue - Print current queue. \n"
+                                  "/menu - Print restaurant menus. \n"
+                                  "/cam - Send image from kiltacam. ")
+
+
+    def answer(self, update, context):
+        """Answer to message that wasn't a command."""
+        if any(phrase in update.message.text.lower() for phrase in ["moi", "hei", "hi", "hello", "helou", "moro", "mo"]):
+            answers = ["Ju moii! ", "Noni terveppä terve"]
+        else:
+            answers = ["Ei se mua haittaa.", "Ei paasata siitä sen enempää. ", "Erittäin hyvin sanottu! "]
+        update.message.reply_text(random.choice(answers))
+
+
+    def cam(self, update, context):
+        """ Send a picture from guild room. """
+        date = datetime.datetime.now()
+        if date.hour not in range(8, 21):
+            # It's night
+            bot_send_media(update, name="kamera_tila.ogg")
+        elif date.isoweekday() not in range(1, 6):
+            # It's weekend
+            bot_send_media(update, name="kamera_tila.ogg")
+        else:
+            # Send image
+            try:
+                with open(PHOTO_PATH, 'rb') as photo:
+                    update.message.reply_photo(photo)
+            except FileNotFoundError:
+                update.message.reply_text("There seems to be something wrong with the camera :/")
+
+
 def spotify_info(update, context):
     """ Print error message when /spotify command is run, in --no-spotify mode. """
     update.message.reply_text("I am currently running in \"no spotify mode\". "
@@ -241,7 +297,8 @@ class Spotify:
         """ Create spotify auth object. """
         # Read the api token from locally saved txt file. First line client id, second line secret token
         scope = "user-modify-playback-state user-read-currently-playing"
-        with open("spotify.txt") as spotify_file:
+        script_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
+        with open(os.path.join(script_dir, "auth/spotify.txt")) as spotify_file:
             lines = spotify_file.readlines()
             client_id = lines[0].strip()
             client_secret = lines[1].strip()
@@ -302,7 +359,7 @@ class Spotify:
             update.message.reply_text("Wrong token. Please try again...")
 
     def authenticate(self, update, context):
-        """ Authenticate . """
+        """ Authenticate. """
         if self.check_auth(update, context):
             markup = create_command_keyboard(update, context)
             update.message.reply_text('Spotify controls:', reply_markup=markup)
@@ -476,42 +533,6 @@ def error_callback(update, context):
         context.bot.send_message(update.effective_message.chat_id, error.msg)
 
 
-def define_commands(dispatcher, spotify):
-    """ Define bot commands! """
-    dispatcher.add_handler(CommandHandler("start", start_chat))
-    dispatcher.add_handler(CommandHandler("help", help_command))
-
-    dispatcher.add_handler(CommandHandler(["cam", "kiltacam", "snap"], cam))
-    dispatcher.add_handler(CommandHandler(["menu", "ruokalista"], print_menu))
-    dispatcher.add_handler(CallbackQueryHandler(restaurant_button, pattern=restaurant_type_check))
-
-    if spotify:
-        spotify_api = Spotify("393afc97e7cbc2502711db80685dbed507d63be0")
-
-        dispatcher.add_handler(CommandHandler(["spotify"], spotify_api.authenticate))
-        dispatcher.add_handler(CommandHandler(["add"], spotify_api.add_to_queue))
-        dispatcher.add_handler(CommandHandler(["queue"], spotify_api.print_queue))
-        dispatcher.add_handler(CommandHandler(["pause", "stop"], spotify_api.pause))
-        dispatcher.add_handler(CommandHandler(["play", "unpause", "continue"], spotify_api.start))
-        dispatcher.add_handler(CommandHandler(["next", "skip"], spotify_api.next_track))
-        dispatcher.add_handler(CommandHandler(["previous"], spotify_api.previous_track))
-        dispatcher.add_handler(CommandHandler(["back"], spotify_api.back))
-
-        # Admin commands
-        dispatcher.add_handler(CommandHandler(["admin"], spotify_api.admin))
-        dispatcher.add_handler(CommandHandler(["token"], spotify_api.new_token))
-        dispatcher.add_handler(CommandHandler(["restrict"], spotify_api.restrict_access))
-
-        dispatcher.add_handler(MessageHandler(Filters.reply & Filters.text, spotify_api.handle_replies))
-        dispatcher.add_handler(CallbackQueryHandler(spotify_api.add_to_queue_button,
-                                                    pattern=add_to_queue_type_check))
-        dispatcher.add_error_handler(error_callback)
-    else:
-        dispatcher.add_handler(CommandHandler(["spotify"], spotify_info))
-
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, answer))
-
-
 def parse_arguments():
     """ Parse system arguments. """
     parser = argparse.ArgumentParser()
@@ -522,14 +543,4 @@ def parse_arguments():
 
 if __name__ == '__main__':
     args = parse_arguments()
-    # Read the api token from locally saved txt file
-    script_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
-    with open(os.path.join(script_dir, "token.txt")) as token_file:
-        token = token_file.readlines()[0].strip()
-    updater = Updater(token, arbitrary_callback_data=True, use_context=True)
-
-    define_commands(updater.dispatcher, args.spotify)
-    # Start the Bot
-    updater.start_polling()
-    # Run bot in background
-    updater.idle()
+    BotController(args.spotify, True)
