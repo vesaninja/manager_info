@@ -21,7 +21,7 @@ class Ui_InfoScreen(object):
     def setupUi(self, InfoScreen):
         if not InfoScreen.objectName():
             InfoScreen.setObjectName(u"InfoScreen")
-        InfoScreen.resize(1190, 630)
+        InfoScreen.resize(1920, 1020)
         self.Clock = QLabel(InfoScreen)
         self.Clock.setObjectName(u"Clock")
         self.Clock.setGeometry(QRect(1100, 600, 140, 60))
@@ -31,7 +31,7 @@ class Ui_InfoScreen(object):
         self.Clock.setFont(font)
         self.Background = QLabel(InfoScreen)
         self.Background.setObjectName(u"Background")
-        self.Background.setGeometry(QRect(0, 0, 1190, 630))
+        self.Background.setGeometry(QRect(0, 0, 1920, 1020))
         self.Background.setAutoFillBackground(False)
         self.Background.raise_()
         self.Clock.raise_()
