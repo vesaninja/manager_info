@@ -31,7 +31,7 @@ class Ui_InfoScreen(object):
         self.Clock.setFont(font)
         self.Background = QLabel(InfoScreen)
         self.Background.setObjectName(u"Background")
-        self.Background.setGeometry(QRect(0, 0, 1280, 720))
+        self.Background.setGeometry(QRect(0, 0, 1200, 675))
         self.Background.setAutoFillBackground(False)
         self.Background.raise_()
         self.Clock.raise_()
