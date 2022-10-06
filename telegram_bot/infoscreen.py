@@ -3,10 +3,9 @@ import sys
 import os
 from kiltabotti import BotController
 
-from PySide6.QtWidgets import QApplication, QWidget, QLabel
-from PySide6.QtGui import QPixmap, QColor
-from PySide6.QtUiTools import loadUiType
-from PySide6.QtCore import QTimer, QTime
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel
+from PyQt5.QtGui import QPixmap, QColor
+from PyQt5.QtCore import QTimer, QTime
 
 # current_dir = os.path.dirname(os.path.abspath(__file__))
 # Form, Base = loadUiType(os.path.join(current_dir, "form.ui"))
