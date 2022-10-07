@@ -90,15 +90,17 @@ class InfoScreen(QWidget):
         """ Update the bus information. """
         buses = self.nysse_api.get_stop_info("3735")
         self.timetable1.clear()
-        for bus in buses[0:4]:
-            string = "{} - {}".format(bus[0], bus[1])
-            self.timetable1.addItem(string)
+        if buses:
+            for bus in buses[0:4]:
+                string = "{} - {}".format(bus[0], bus[1])
+                self.timetable1.addItem(string)
 
-        buses = self.nysse_api.get_stop_info("0833")
+        trams = self.nysse_api.get_stop_info("0833")
         self.timetable2.clear()
-        for bus in buses[0:2]:
-            string = "{} - {}".format(bus[0], bus[1])
-            self.timetable2.addItem(string)
+        if trams:
+            for tram in trams[0:2]:
+                string = "{} - {}".format(tram[0], tram[1])
+                self.timetable2.addItem(string)
 
 
 if __name__ == "__main__":

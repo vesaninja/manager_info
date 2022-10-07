@@ -21,14 +21,16 @@ class NysseApi:
         url = self.base_url + "stop-monitoring?stops=" + stop_id
         try:
             data = requests.get(url).json()["body"][stop_id]
-        except (KeyError, requests.exceptions.JSONDecodeError):
-            print("error")
+        except (KeyError, ValueError, KeyError) as e:
+            print(e)
             return
         stop_info = []
         for bus in data:
             if "expectedArrivalTime" in bus["call"]:
                 arrival_time = bus["call"]["expectedArrivalTime"]
-            else:
+            elif "aimedArrivalTime" in bus["call"]:
                 arrival_time = bus["call"]["aimedArrivalTime"]
+            else:
+                return
             stop_info.append([bus["lineRef"], self.parse_arrival_time_in_minutes(arrival_time)])
         return stop_info
