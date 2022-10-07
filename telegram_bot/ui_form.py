@@ -22,19 +22,35 @@ class Ui_InfoScreen(object):
         if not InfoScreen.objectName():
             InfoScreen.setObjectName(u"InfoScreen")
         InfoScreen.resize(1830, 985)
-        self.Clock = QLabel(InfoScreen)
-        self.Clock.setObjectName(u"Clock")
-        self.Clock.setGeometry(QRect(1665, 925, 140, 90))
-        font = QFont()
-        font.setPointSize(40)
-        font.setStrikeOut(False)
-        self.Clock.setFont(font)
+
         self.Background = QLabel(InfoScreen)
         self.Background.setObjectName(u"Background")
         self.Background.setGeometry(QRect(0, 0, 1830, 985))
         self.Background.setAutoFillBackground(False)
-        self.Background.raise_()
+
+        self.Clock = QLabel(InfoScreen)
+        self.Clock.setObjectName(u"Clock")
+        self.Clock.setGeometry(QRect(1680, 895, 200, 120))
+        font = QFont()
+        font.setPointSize(35)
+        font.setStrikeOut(False)
+        self.Clock.setFont(font)
+
+        self.SpotifyCode = QLabel(InfoScreen)
+        self.SpotifyCode.setObjectName(u"SpotifyCode")
+        self.SpotifyCode.setGeometry(QRect(1700, 30, 160, 90))
+        self.SpotifyCode.setAutoFillBackground(False)
+        self.SpotifyCode.setFont(font)
+
+        self.Timetable = QLabel(InfoScreen)
+        self.Timetable.setObjectName(u"Timetable")
+        self.Timetable.setGeometry(QRect(1300, 300, 500, 500))
+        self.Timetable.setAutoFillBackground(False)
+        self.Timetable.setFont(font)
+
+        # self.Background.raise_()
         self.Clock.raise_()
+        self.SpotifyCode.raise_()
 
         self.retranslateUi(InfoScreen)
 

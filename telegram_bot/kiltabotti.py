@@ -171,9 +171,11 @@ RESTAURANTS = {"REAKTORI": reaktori, "HERTSI": hertsi, "NEWTON": newton}
 class BotController:
     def __init__(self, spotify=True, idle=False):
         """ Class for handling bot commands"""
-        self.spotify_enabled = spotify
+        if spotify:
+            self.spotify_api = Spotify("393afc97e7cbc2502711db80685dbed507d63be0")
+        else:
+            self.spotify_api = None
         self.updater = self.startup(idle)
-
 
     def startup(self, idle):
         """ Authenticate the bot and initialize the updater. """
@@ -198,25 +200,23 @@ class BotController:
         dispatcher.add_handler(CommandHandler(["menu", "ruokalista"], print_menu))
         dispatcher.add_handler(CallbackQueryHandler(restaurant_button, pattern=restaurant_type_check))
 
-        if self.spotify_enabled:
-            spotify_api = Spotify("393afc97e7cbc2502711db80685dbed507d63be0")
-
-            dispatcher.add_handler(CommandHandler(["spotify"], spotify_api.authenticate))
-            dispatcher.add_handler(CommandHandler(["add"], spotify_api.add_to_queue))
-            dispatcher.add_handler(CommandHandler(["queue"], spotify_api.print_queue))
-            dispatcher.add_handler(CommandHandler(["pause", "stop"], spotify_api.pause))
-            dispatcher.add_handler(CommandHandler(["play", "unpause", "continue"], spotify_api.start))
-            dispatcher.add_handler(CommandHandler(["next", "skip"], spotify_api.next_track))
-            dispatcher.add_handler(CommandHandler(["previous"], spotify_api.previous_track))
-            dispatcher.add_handler(CommandHandler(["back"], spotify_api.back))
+        if self.spotify_api:
+            dispatcher.add_handler(CommandHandler(["spotify"], self.spotify_api.authenticate))
+            dispatcher.add_handler(CommandHandler(["add"], self.spotify_api.add_to_queue))
+            dispatcher.add_handler(CommandHandler(["queue"], self.spotify_api.print_queue))
+            dispatcher.add_handler(CommandHandler(["pause", "stop"], self.spotify_api.pause))
+            dispatcher.add_handler(CommandHandler(["play", "unpause", "continue"], self.spotify_api.start))
+            dispatcher.add_handler(CommandHandler(["next", "skip"], self.spotify_api.next_track))
+            dispatcher.add_handler(CommandHandler(["previous"], self.spotify_api.previous_track))
+            dispatcher.add_handler(CommandHandler(["back"], self.spotify_api.back))
 
             # Admin commands
-            dispatcher.add_handler(CommandHandler(["admin"], spotify_api.admin))
-            dispatcher.add_handler(CommandHandler(["token"], spotify_api.new_token))
-            dispatcher.add_handler(CommandHandler(["restrict"], spotify_api.restrict_access))
+            dispatcher.add_handler(CommandHandler(["admin"], self.spotify_api.admin))
+            dispatcher.add_handler(CommandHandler(["token"], self.spotify_api.new_token))
+            dispatcher.add_handler(CommandHandler(["restrict"], self.spotify_api.restrict_access))
 
-            dispatcher.add_handler(MessageHandler(Filters.reply & Filters.text, spotify_api.handle_replies))
-            dispatcher.add_handler(CallbackQueryHandler(spotify_api.add_to_queue_button,
+            dispatcher.add_handler(MessageHandler(Filters.reply & Filters.text, self.spotify_api.handle_replies))
+            dispatcher.add_handler(CallbackQueryHandler(self.spotify_api.add_to_queue_button,
                                                         pattern=add_to_queue_type_check))
             dispatcher.add_error_handler(error_callback)
         else:
@@ -229,11 +229,10 @@ class BotController:
         markup = create_command_keyboard(update, context, startup=True)
         update.message.reply_markdown_v2(
             f"Hi {update.effective_user.mention_markdown_v2()}, \n"
-            f"Welcome to the free 30 day trial of KiltaBot \n"
+            f"Welcome to Kiltabot \n"
             f"Use command /help to list currently available commands \n",
             reply_markup=markup
         )
-
 
     def help_command(self, update, context):
         """Send a message when the command /help is issued."""
@@ -247,7 +246,6 @@ class BotController:
                                   "/menu - Print restaurant menus. \n"
                                   "/cam - Send image from kiltacam. ")
 
-
     def answer(self, update, context):
         """Answer to message that wasn't a command."""
         if any(phrase in update.message.text.lower() for phrase in ["moi", "hei", "hi", "hello", "helou", "moro", "mo"]):
@@ -255,7 +253,6 @@ class BotController:
         else:
             answers = ["Ei se mua haittaa.", "Ei paasata siitä sen enempää. ", "Erittäin hyvin sanottu! "]
         update.message.reply_text(random.choice(answers))
-
 
     def cam(self, update, context):
         """ Send a picture from guild room. """
@@ -323,13 +320,17 @@ class Spotify:
         self.auth_token = str(random.randint(0, 9999)).zfill(4)
         logger.info(self.auth_token)
 
-    def new_token(self, update, context):
-        """ Generate new auth token. """
+    def new_token(self, update=None, context=None):
+        """ Generate and return new spotify user auth token. """
         if check_admin(update, context):
             self.update_auth_token()
             update.message.reply_text("New token: {}".format(self.auth_token))
         else:
             update.message.reply_text("This action requires admin rights!")
+
+    def get_token(self):
+        """ Get the auth token. """
+        return self.auth_token
 
     def restrict_access(self, update, context):
         """ Restrict access for non-admin users. """
