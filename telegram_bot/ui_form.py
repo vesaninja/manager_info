@@ -15,7 +15,7 @@ from PyQt5.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PyQt5.QtWidgets import (QApplication, QLabel, QSizePolicy, QWidget)
+from PyQt5.QtWidgets import (QApplication, QLabel, QSizePolicy, QWidget, QListWidget)
 
 class Ui_InfoScreen(object):
     def setupUi(self, InfoScreen):
@@ -38,15 +38,27 @@ class Ui_InfoScreen(object):
 
         self.SpotifyCode = QLabel(InfoScreen)
         self.SpotifyCode.setObjectName(u"SpotifyCode")
-        self.SpotifyCode.setGeometry(QRect(1700, 30, 160, 90))
-        self.SpotifyCode.setAutoFillBackground(False)
+        self.SpotifyCode.setGeometry(QRect(1600, 10, 200, 100))
+        font = QFont()
+        font.setPointSize(50)
+        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 15)
         self.SpotifyCode.setFont(font)
 
-        self.Timetable = QLabel(InfoScreen)
-        self.Timetable.setObjectName(u"Timetable")
-        self.Timetable.setGeometry(QRect(1300, 300, 500, 500))
-        self.Timetable.setAutoFillBackground(False)
-        self.Timetable.setFont(font)
+        self.Timetable1 = QListWidget(InfoScreen)
+        self.Timetable1.setObjectName(u"Timetable1")
+        self.Timetable1.setGeometry(QRect(1450, 280, 500, 500))
+        self.Timetable1.setAutoFillBackground(False)
+        font = QFont()
+        font.setPointSize(30)
+        self.Timetable1.setFont(font)
+
+        self.Timetable2 = QListWidget(InfoScreen)
+        self.Timetable2.setObjectName(u"Timetable2")
+        self.Timetable2.setGeometry(QRect(1450, 580, 500, 500))
+        self.Timetable2.setAutoFillBackground(False)
+        font = QFont()
+        font.setPointSize(30)
+        self.Timetable2.setFont(font)
 
         # self.Background.raise_()
         self.Clock.raise_()

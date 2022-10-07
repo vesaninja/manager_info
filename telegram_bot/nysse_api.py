@@ -17,21 +17,18 @@ class NysseApi:
         new_time = arrival_datetime.strftime("%H:%M")
         return new_time
 
-    def get_stop_info(self, stop_id=3735):
-        url = self.base_url + "stop-monitoring?stops=" + str(stop_id)
+    def get_stop_info(self, stop_id):
+        url = self.base_url + "stop-monitoring?stops=" + stop_id
         try:
-            data = response = requests.get(url).json()["body"][str(stop_id)]
+            data = requests.get(url).json()["body"][stop_id]
         except (KeyError, requests.exceptions.JSONDecodeError):
             print("error")
             return
-        stop_info = {}
+        stop_info = []
         for bus in data:
             if "expectedArrivalTime" in bus["call"]:
                 arrival_time = bus["call"]["expectedArrivalTime"]
             else:
                 arrival_time = bus["call"]["aimedArrivalTime"]
-            if bus["lineRef"] not in stop_info:
-                stop_info[bus["lineRef"]] = self.parse_arrival_time_in_minutes(arrival_time)
-            else:
-                stop_info[bus["lineRef"] + "L"] = self.parse_arrival_time_in_minutes(arrival_time)
+            stop_info.append([bus["lineRef"], self.parse_arrival_time_in_minutes(arrival_time)])
         return stop_info

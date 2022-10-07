@@ -4,7 +4,7 @@ import os
 from kiltabotti import BotController
 from nysse_api import NysseApi
 
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QGraphicsDropShadowEffect
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QGraphicsDropShadowEffect, QListWidget, QFrame
 from PyQt5.QtGui import QPixmap, QColor
 from PyQt5.QtCore import QTimer, QTime
 
@@ -34,7 +34,8 @@ class InfoScreen(QWidget):
 
         self.clock = self.setup_clock()
         self.spotify_code_label = self.setup_spotify_code()
-        self.timetable = self.setup_timetable()
+        self.timetable1 = self.setup_timetable("Timetable1")
+        self.timetable2 = self.setup_timetable("Timetable2")
         self.setup_timers()
 
     def setup_timers(self):
@@ -75,17 +76,29 @@ class InfoScreen(QWidget):
         token = self.bot_controller.spotify_api.get_token()
         self.spotify_code_label.setText(token)
 
-    def setup_timetable(self):
+    def setup_timetable(self, timetable_name):
         """ Set up a table to show arriving buses. """
-        timetable = self.findChild(QLabel, "Timetable")
+        timetable = self.findChild(QListWidget, timetable_name)
         timetable.setStyleSheet("color: white")
-        timetable.setText("Bussiaikataulut")
+        timetable.addItem("Bussiaikataulut")
+        timetable.setStyleSheet("background-color: transparent; color: white")
+        timetable.setFrameShape(QFrame.NoFrame)
+        timetable.setSpacing(-2)
         return timetable
 
     def update_timetable(self):
         """ Update the bus information. """
-        buses = self.nysse_api.get_stop_info()
-        self.timetable.setText(str(buses))
+        buses = self.nysse_api.get_stop_info("3735")
+        self.timetable1.clear()
+        for bus in buses[0:4]:
+            string = "{} - {}".format(bus[0], bus[1])
+            self.timetable1.addItem(string)
+
+        buses = self.nysse_api.get_stop_info("0833")
+        self.timetable2.clear()
+        for bus in buses[0:2]:
+            string = "{} - {}".format(bus[0], bus[1])
+            self.timetable2.addItem(string)
 
 
 if __name__ == "__main__":
@@ -94,5 +107,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     info_screen = InfoScreen(bot_controller, nysse_api)
     info_screen.show()
-    # info_screen.Clock
     sys.exit(app.exec())

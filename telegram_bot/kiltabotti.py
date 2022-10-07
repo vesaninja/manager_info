@@ -1,5 +1,4 @@
 import logging
-
 import telegram
 from telegram import ReplyKeyboardMarkup, ForceReply, InlineKeyboardMarkup,\
     InlineKeyboardButton, KeyboardButton
@@ -12,6 +11,7 @@ import requests
 import datetime
 import os
 import sys
+import restaurant_api
 
 # Enable logging
 logging.basicConfig(
@@ -48,23 +48,6 @@ def check_admin(update, context):
     return False
 
 
-def create_command_keyboard(update, context, startup=False):
-    """ Create keyboard for spotify commands. """
-    if startup:
-        keyboard = [[KeyboardButton("/spotify"), KeyboardButton("/cam")],
-                    [KeyboardButton("/menu")]]
-    elif check_admin(update, context):
-        keyboard = [[KeyboardButton("/previous"), KeyboardButton("/play"), KeyboardButton("/next")],
-                    [KeyboardButton("/queue"), KeyboardButton("/pause"), KeyboardButton("/add")],
-                    [KeyboardButton("/restrict"), KeyboardButton("/token"), KeyboardButton("/back")]]
-    else:
-        keyboard = [[KeyboardButton("/previous"), KeyboardButton("/next")],
-                    [KeyboardButton("/play"), KeyboardButton("/pause")],
-                    [KeyboardButton("/queue"), KeyboardButton("/add")],
-                    [KeyboardButton("/back")]]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-
 def bot_send_media(update, path=MEDIA_PATH, media_type="voice", name=""):
     """ Open and send media. """
     try:
@@ -81,93 +64,6 @@ def bot_send_media(update, path=MEDIA_PATH, media_type="voice", name=""):
 #  Start of bot commands.
 ######################################################################################################################
 
-
-def print_menu(update, context):
-    """ Print menu for the chosen restaurant. """
-    if context.args:
-        restaurant = context.args[0].upper()
-        if restaurant in RESTAURANTS:
-            RESTAURANTS[restaurant](update, context)
-            return
-    keyboard = [
-        [InlineKeyboardButton("Reaktori", callback_data={"type": "restaurant", "function": reaktori})],
-        [InlineKeyboardButton("Hertsi", callback_data={"type": "restaurant", "function": hertsi})],
-        [InlineKeyboardButton("Newton", callback_data={"type": "restaurant", "function": newton})]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text('Choose restaurant:', reply_markup=reply_markup)
-
-
-def restaurant_button(update, context):
-    """ Handles the button actions of /menu command. """
-    query = update.callback_query
-    update.callback_query.data["function"](update, context)
-    query.edit_message_text(text="Menu: ")
-    context.drop_callback_data(query)
-
-
-def reaktori(update, context):
-    """ Prints Reaktori's menu"""
-    language = "fi"
-    url = "https://www.foodandco.fi/modules/json/json/Index?costNumber=0812&language={}".format(language)
-    response = requests.get(url)
-    data = response.json()["MenusForDays"]
-    date = datetime.datetime.now().strftime("%y-%m-%d")
-    message = ""
-    for day in data:
-        if date in day["Date"]:
-            if not day["LunchTime"]:
-                message += "It looks like the restaurant is closed today. "
-                break
-            for menu in day["SetMenus"]:
-                message += "\n<b>{}</b> -- <i>{}</i>\n".format(menu["Name"], menu["Price"])
-                for component in menu["Components"]:
-                    message += "\t\t{}\n".format(component)
-
-    context.bot.send_message(update.effective_message.chat_id, message, parse_mode=telegram.ParseMode.HTML)
-
-
-def hertsi(update, context):
-    """ Prints Hertsi's menu"""
-    url = "https://www.sodexo.fi/en/ruokalistat/output/weekly_json/111"
-    response = requests.get(url)
-    data = response.json()["mealdates"]
-    current_weekday = datetime.datetime.today().strftime('%A')
-    message = ""
-    for day in data:
-        if current_weekday == day["date"]:
-            for menu_num in day["courses"]:
-                menu = day["courses"][menu_num]
-                message += "\n<b>{}</b> -- <i>{}</i>\n".format(menu["title_fi"], menu["price"])
-                for recipe_num in menu["recipes"]:
-                    if "name" in menu["recipes"][recipe_num]:
-                        message += "\t\t{}\n".format(menu["recipes"][recipe_num]["name"])
-    if not message:
-        message += "It looks like the restaurant is closed today. "
-
-    context.bot.send_message(update.effective_message.chat_id, message, parse_mode=telegram.ParseMode.HTML)
-
-
-def newton(update, context):
-    """ Prints Newton's menu"""
-    message = ""
-    date = datetime.datetime.now().strftime("%Y%m%d")
-    url = "https://fi.jamix.cloud/apps/menuservice/rest/haku/menu/12347/6/?lang=fi&date={}&date2={}".format(date, date)
-    response = requests.get(url)
-    data = response.json()[0]["menuTypes"]
-    for menu_name in data:
-        if menu_name["menuTypeName"] in ["Lounas", "Kasvis", "Konehuone"]:
-            meal_list = menu_name["menus"][0]["days"][0]["mealoptions"]
-            for meal in meal_list:
-                message += "\n<b>{}</b>\n".format(meal["name"], "price")
-                for recipe in meal["menuItems"]:
-                    message += "\t\t{}\n".format(recipe["name"])
-    context.bot.send_message(update.effective_message.chat_id, message, parse_mode=telegram.ParseMode.HTML)
-
-
-RESTAURANTS = {"REAKTORI": reaktori, "HERTSI": hertsi, "NEWTON": newton}
-
-
 class BotController:
     def __init__(self, spotify=True, idle=False):
         """ Class for handling bot commands"""
@@ -176,6 +72,7 @@ class BotController:
         else:
             self.spotify_api = None
         self.updater = self.startup(idle)
+        self.RESTAURANTS = {"REAKTORI": self.reaktori, "HERTSI": self.hertsi, "NEWTON": self.newton}
 
     def startup(self, idle):
         """ Authenticate the bot and initialize the updater. """
@@ -197,8 +94,8 @@ class BotController:
         dispatcher.add_handler(CommandHandler("help", self.help_command))
 
         dispatcher.add_handler(CommandHandler(["cam", "kiltacam", "snap"], self.cam))
-        dispatcher.add_handler(CommandHandler(["menu", "ruokalista"], print_menu))
-        dispatcher.add_handler(CallbackQueryHandler(restaurant_button, pattern=restaurant_type_check))
+        dispatcher.add_handler(CommandHandler(["menu", "ruokalista"], self.print_menu))
+        dispatcher.add_handler(CallbackQueryHandler(self.restaurant_button, pattern=restaurant_type_check))
 
         if self.spotify_api:
             dispatcher.add_handler(CommandHandler(["spotify"], self.spotify_api.authenticate))
@@ -270,6 +167,61 @@ class BotController:
                     update.message.reply_photo(photo)
             except FileNotFoundError:
                 update.message.reply_text("There seems to be something wrong with the camera :/")
+
+    def print_menu(self, update, context):
+        """ Print menu for the chosen restaurant. """
+
+        if context.args:
+            restaurant = context.args[0].upper()
+            if restaurant in self.RESTAURANTS:
+                self.RESTAURANTS[restaurant](update, context)
+                return
+        keyboard = [
+            [InlineKeyboardButton("Reaktori", callback_data={"type": "restaurant", "function": self.reaktori})],
+            [InlineKeyboardButton("Hertsi", callback_data={"type": "restaurant", "function": self.hertsi})],
+            [InlineKeyboardButton("Newton", callback_data={"type": "restaurant", "function": self.newton})]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        update.message.reply_text('Choose restaurant:', reply_markup=reply_markup)
+
+    def restaurant_button(self, update, context):
+        """ Handles the button actions of /menu command. """
+        query = update.callback_query
+        update.callback_query.data["function"](update, context)
+        query.edit_message_text(text="Menu: ")
+        context.drop_callback_data(query)
+
+    def reaktori(self, update, context):
+        """ Prints Reaktori's menu"""
+        message = restaurant_api.get_reaktori_menu()
+        context.bot.send_message(update.effective_message.chat_id, message, parse_mode=telegram.ParseMode.HTML)
+
+    def hertsi(self, update, context):
+        """ Prints Hertsi's menu"""
+        message = restaurant_api.get_hertsi_menu()
+        context.bot.send_message(update.effective_message.chat_id, message, parse_mode=telegram.ParseMode.HTML)
+
+    def newton(self, update, context):
+        """ Prints Newton's menu"""
+        message = restaurant_api.get_newton_menu()
+        context.bot.send_message(update.effective_message.chat_id, message, parse_mode=telegram.ParseMode.HTML)
+
+
+def create_command_keyboard(update, context, startup=False):
+    """ Create keyboard for spotify commands. """
+    if startup:
+        keyboard = [[KeyboardButton("/spotify"), KeyboardButton("/cam")],
+                    [KeyboardButton("/menu")]]
+    elif check_admin(update, context):
+        keyboard = [[KeyboardButton("/previous"), KeyboardButton("/play"), KeyboardButton("/next")],
+                    [KeyboardButton("/queue"), KeyboardButton("/pause"), KeyboardButton("/add")],
+                    [KeyboardButton("/restrict"), KeyboardButton("/token"), KeyboardButton("/back")]]
+    else:
+        keyboard = [[KeyboardButton("/previous"), KeyboardButton("/next")],
+                    [KeyboardButton("/play"), KeyboardButton("/pause")],
+                    [KeyboardButton("/queue"), KeyboardButton("/add")],
+                    [KeyboardButton("/back")]]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
 def spotify_info(update, context):
