@@ -15,7 +15,7 @@ from PyQt5.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PyQt5.QtWidgets import (QApplication, QLabel, QSizePolicy, QWidget, QListWidget)
+from PyQt5.QtWidgets import (QApplication, QLabel, QSizePolicy, QWidget, QListWidget, QProgressBar)
 
 class Ui_InfoScreen(object):
     def setupUi(self, InfoScreen):
@@ -39,10 +39,10 @@ class Ui_InfoScreen(object):
         self.SpotifyCode = QLabel(InfoScreen)
         self.SpotifyCode.setObjectName(u"SpotifyCode")
         self.SpotifyCode.setGeometry(QRect(1600, 10, 200, 100))
-        font = QFont()
-        font.setPointSize(50)
-        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 15)
-        self.SpotifyCode.setFont(font)
+        spotify_font = QFont()
+        spotify_font.setPointSize(50)
+        spotify_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 15)
+        self.SpotifyCode.setFont(spotify_font)
 
         self.Timetable1 = QListWidget(InfoScreen)
         self.Timetable1.setObjectName(u"Timetable1")
@@ -60,7 +60,18 @@ class Ui_InfoScreen(object):
         font.setPointSize(30)
         self.Timetable2.setFont(font)
 
-        # self.Background.raise_()
+        self.NowPlaying = QLabel(InfoScreen)
+        self.NowPlaying.setObjectName(u"NowPlaying")
+        self.NowPlaying.setGeometry(QRect(80, 930, 1000, 50))
+        font = QFont()
+        font.setPointSize(25)
+        # font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 15)
+        self.NowPlaying.setFont(font)
+
+        self.ProgressBar = QProgressBar(InfoScreen)
+        self.ProgressBar.setObjectName(u"ProgressBar")
+        self.ProgressBar.setGeometry(QRect(0, 920, 1080, 50))
+
         self.Clock.raise_()
         self.SpotifyCode.raise_()
 

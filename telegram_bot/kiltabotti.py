@@ -68,9 +68,9 @@ class BotController:
     def __init__(self, spotify=True, idle=False):
         """ Class for handling bot commands"""
         if spotify:
-            self.spotify_api = Spotify("393afc97e7cbc2502711db80685dbed507d63be0")
+            self.spotify_controller = Spotify("393afc97e7cbc2502711db80685dbed507d63be0")
         else:
-            self.spotify_api = None
+            self.spotify_controller = None
         self.updater = self.startup(idle)
         self.RESTAURANTS = {"REAKTORI": self.reaktori, "HERTSI": self.hertsi, "NEWTON": self.newton}
 
@@ -97,23 +97,23 @@ class BotController:
         dispatcher.add_handler(CommandHandler(["menu", "ruokalista"], self.print_menu))
         dispatcher.add_handler(CallbackQueryHandler(self.restaurant_button, pattern=restaurant_type_check))
 
-        if self.spotify_api:
-            dispatcher.add_handler(CommandHandler(["spotify"], self.spotify_api.authenticate))
-            dispatcher.add_handler(CommandHandler(["add"], self.spotify_api.add_to_queue))
-            dispatcher.add_handler(CommandHandler(["queue"], self.spotify_api.print_queue))
-            dispatcher.add_handler(CommandHandler(["pause", "stop"], self.spotify_api.pause))
-            dispatcher.add_handler(CommandHandler(["play", "unpause", "continue"], self.spotify_api.start))
-            dispatcher.add_handler(CommandHandler(["next", "skip"], self.spotify_api.next_track))
-            dispatcher.add_handler(CommandHandler(["previous"], self.spotify_api.previous_track))
-            dispatcher.add_handler(CommandHandler(["back"], self.spotify_api.back))
+        if self.spotify_controller:
+            dispatcher.add_handler(CommandHandler(["spotify"], self.spotify_controller.authenticate))
+            dispatcher.add_handler(CommandHandler(["add"], self.spotify_controller.add_to_queue))
+            dispatcher.add_handler(CommandHandler(["queue"], self.spotify_controller.print_queue))
+            dispatcher.add_handler(CommandHandler(["pause", "stop"], self.spotify_controller.pause))
+            dispatcher.add_handler(CommandHandler(["play", "unpause", "continue"], self.spotify_controller.start))
+            dispatcher.add_handler(CommandHandler(["next", "skip"], self.spotify_controller.next_track))
+            dispatcher.add_handler(CommandHandler(["previous"], self.spotify_controller.previous_track))
+            dispatcher.add_handler(CommandHandler(["back"], self.spotify_controller.back))
 
             # Admin commands
-            dispatcher.add_handler(CommandHandler(["admin"], self.spotify_api.admin))
-            dispatcher.add_handler(CommandHandler(["token"], self.spotify_api.new_token))
-            dispatcher.add_handler(CommandHandler(["restrict"], self.spotify_api.restrict_access))
+            dispatcher.add_handler(CommandHandler(["admin"], self.spotify_controller.admin))
+            dispatcher.add_handler(CommandHandler(["token"], self.spotify_controller.new_token))
+            dispatcher.add_handler(CommandHandler(["restrict"], self.spotify_controller.restrict_access))
 
-            dispatcher.add_handler(MessageHandler(Filters.reply & Filters.text, self.spotify_api.handle_replies))
-            dispatcher.add_handler(CallbackQueryHandler(self.spotify_api.add_to_queue_button,
+            dispatcher.add_handler(MessageHandler(Filters.reply & Filters.text, self.spotify_controller.handle_replies))
+            dispatcher.add_handler(CallbackQueryHandler(self.spotify_controller.add_to_queue_button,
                                                         pattern=add_to_queue_type_check))
             dispatcher.add_error_handler(error_callback)
         else:
@@ -416,13 +416,10 @@ class Spotify:
             if not context.args:
                 raise ValueError()
             query_input = " ".join(context.args[0:])
-            if "vauhti" in query_input:
-                update.message.reply_text("Vauhti kiihtyy wowowow. ")
             reply_markup = self.create_search_keyboard(query_input)
             update.message.reply_text('Results:', reply_markup=reply_markup)
 
         except (IndexError, ValueError):
-            # update.message.reply_text('Usage: /add vauhti kiihtyy')
             update.message.reply_text('Search: ', reply_markup=ForceReply(input_field_placeholder="Search: "))
 
     def add_to_queue_button(self, update, context):

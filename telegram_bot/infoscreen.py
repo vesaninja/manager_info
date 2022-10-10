@@ -4,9 +4,9 @@ import os
 from kiltabotti import BotController
 from nysse_api import NysseApi
 
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QGraphicsDropShadowEffect, QListWidget, QFrame
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QGraphicsDropShadowEffect, QListWidget, QFrame, QProgressBar
 from PyQt5.QtGui import QPixmap, QColor
-from PyQt5.QtCore import QTimer, QTime
+from PyQt5.QtCore import QTimer, QTime, QPropertyAnimation
 
 # current_dir = os.path.dirname(os.path.abspath(__file__))
 # Form, Base = loadUiType(os.path.join(current_dir, "form.ui"))
@@ -36,6 +36,8 @@ class InfoScreen(QWidget):
         self.spotify_code_label = self.setup_spotify_code()
         self.timetable1 = self.setup_timetable("Timetable1")
         self.timetable2 = self.setup_timetable("Timetable2")
+        self.now_playing = self.setup_now_playing()
+        self.progressbar = self.setup_progress_bar()
         self.setup_timers()
 
     def setup_timers(self):
@@ -44,10 +46,12 @@ class InfoScreen(QWidget):
         timer.timeout.connect(self.update_time)
         timer.timeout.connect(self.update_spotify_code)
         timer.timeout.connect(self.update_timetable)
+        timer.timeout.connect(self.update_now_playing)
+        timer.timeout.connect(self.update_progress_bar)
         timer.start(5000)
 
         spotify_timer = QTimer(self)
-        spotify_timer.timeout.connect(self.bot_controller.spotify_api.update_auth_token)
+        spotify_timer.timeout.connect(self.bot_controller.spotify_controller.update_auth_token)
         spotify_timer.start(10800000)
 
     def setup_clock(self):
@@ -72,9 +76,26 @@ class InfoScreen(QWidget):
 
     def update_spotify_code(self):
         """ Show update the spotify auth token """
-        # self.bot_controller.spotify_api.update_auth_token()
-        token = self.bot_controller.spotify_api.get_token()
+        token = self.bot_controller.spotify_controller.get_token()
         self.spotify_code_label.setText(token)
+
+    def setup_now_playing(self):
+        """ Set up a label that shows currently playing spotify song. """
+        now_playing = self.findChild(QLabel, "NowPlaying")
+        now_playing.setStyleSheet("color: white")
+        now_playing.setText("Infonäyttöön liittyviä kehitysehdotuksia voi lähettää Vesalle")
+        return now_playing
+
+    def update_now_playing(self):
+        """ Update currently playing spotify song. """
+        try:
+            song_data = self.bot_controller.spotify_controller.spotify_api.currently_playing()
+            current_artist = song_data["item"]["artists"][0]["name"]
+            current_song = song_data["item"]["name"]
+            song_text = "{} - {}".format(current_artist, current_song)
+        except:
+            song_text = "Infonäyttöön liittyviä kehitysehdotuksia voi lähettää Vesalle"
+        self.now_playing.setText(song_text)
 
     def setup_timetable(self, timetable_name):
         """ Set up a table to show arriving buses. """
@@ -101,6 +122,29 @@ class InfoScreen(QWidget):
             for tram in trams[0:2]:
                 string = "{} - {}".format(tram[0], tram[1])
                 self.timetable2.addItem(string)
+
+    def setup_progress_bar(self):
+        """ Set up a spotify song progress bar """
+        progressbar = self.findChild(QProgressBar, "ProgressBar")
+        progressbar.setValue(0)
+        progressbar.setTextVisible(False)
+        self.setStyleSheet("QProgressBar { min-height: 3px; max-height: 3px; border-radius: 6px; border-radius: 6px;"
+                           " background-color: transparent}"
+                           "QProgressBar::chunk { background-color: white; width: 1px}")
+        return progressbar
+
+    def update_progress_bar(self):
+        """ Update the now playing progress """
+        try:
+            data = self.bot_controller.spotify_controller.spotify_api.currently_playing()
+            new_value = int(int(data["progress_ms"]) / int(data["item"]["duration_ms"]) * 100)
+        except:
+            new_value = 0
+        animation = QPropertyAnimation(self.progressbar, b"value", self)
+        animation.setDuration(5000)
+        animation.setStartValue(self.progressbar.value())
+        animation.setEndValue(new_value)
+        animation.start()
 
 
 if __name__ == "__main__":
