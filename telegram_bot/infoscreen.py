@@ -1,12 +1,14 @@
 # This Python file uses the following encoding: utf-8
+import logging
 import sys
 import os
 from kiltabotti import BotController
 from nysse_api import NysseApi
+from restaurant_api import get_newton_menu, get_reaktori_menu, get_hertsi_menu
 
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QGraphicsDropShadowEffect, QListWidget, QFrame, QProgressBar
 from PyQt5.QtGui import QPixmap, QColor
-from PyQt5.QtCore import QTimer, QTime, QPropertyAnimation
+from PyQt5.QtCore import QTimer, QTime, QPropertyAnimation, Qt
 
 # current_dir = os.path.dirname(os.path.abspath(__file__))
 # Form, Base = loadUiType(os.path.join(current_dir, "form.ui"))
@@ -26,6 +28,7 @@ class InfoScreen(QWidget):
         self.showFullScreen()
         self.bot_controller = bot_controller
         self.nysse_api = nysse_api
+        self.current_restaurant = "NEWTON"
 
         # Set background image
         bg = self.findChild(QLabel, "Background")
@@ -38,6 +41,8 @@ class InfoScreen(QWidget):
         self.timetable2 = self.setup_timetable("Timetable2")
         self.now_playing = self.setup_now_playing()
         self.progressbar = self.setup_progress_bar()
+        self.food_menu = self.setup_foodmenu()
+        self.restaurant_label = self.setup_restaurant_label()
         self.setup_timers()
 
     def setup_timers(self):
@@ -49,6 +54,10 @@ class InfoScreen(QWidget):
         timer.timeout.connect(self.update_now_playing)
         timer.timeout.connect(self.update_progress_bar)
         timer.start(5000)
+
+        restaurant_timer = QTimer(self)
+        restaurant_timer.timeout.connect(self.update_foodmenu)
+        restaurant_timer.start(15000)
 
         spotify_timer = QTimer(self)
         spotify_timer.timeout.connect(self.bot_controller.spotify_controller.update_auth_token)
@@ -138,13 +147,51 @@ class InfoScreen(QWidget):
         try:
             data = self.bot_controller.spotify_controller.spotify_api.currently_playing()
             new_value = int(int(data["progress_ms"]) / int(data["item"]["duration_ms"]) * 100)
+            if new_value < self.progressbar.value():
+                new_value = 0
         except:
             new_value = 0
         animation = QPropertyAnimation(self.progressbar, b"value", self)
-        animation.setDuration(5000)
+        animation.setDuration(3000)
         animation.setStartValue(self.progressbar.value())
         animation.setEndValue(new_value)
         animation.start()
+
+    def setup_foodmenu(self):
+        """ Set up a table to show restauran menus. """
+        food_menu = self.findChild(QLabel, "FoodMenu")
+        food_menu.setStyleSheet("color: white")
+        food_menu.setText("Suljettu")
+        food_menu.setWordWrap(True)
+        food_menu.setAlignment(Qt.AlignTop)
+        return food_menu
+
+    def setup_restaurant_label(self):
+        """ Set up a table to show restaurant name. """
+        restaurant_label = self.findChild(QLabel, "Restaurant")
+        restaurant_label.setStyleSheet("color: white")
+        restaurant_label.setText("Newton")
+        restaurant_label.setWordWrap(True)
+        restaurant_label.setAlignment(Qt.AlignTop)
+        restaurant_label.setGraphicsEffect(QGraphicsDropShadowEffect())
+        return restaurant_label
+
+    def update_foodmenu(self):
+        """ Update the restauran menu information. """
+        if self.current_restaurant == "HERTSI":
+            menu = get_newton_menu()
+            self.current_restaurant = "NEWTON"
+        elif self.current_restaurant == "NEWTON":
+            menu = get_reaktori_menu()
+            self.current_restaurant = "REAKTORI"
+        elif self.current_restaurant == "REAKTORI":
+            menu = get_hertsi_menu()
+            self.current_restaurant = "HERTSI"
+        formated_menu = ""
+        for line in menu.splitlines():
+            formated_menu += "{}<br>".format(line)
+        self.food_menu.setText(formated_menu)
+        self.restaurant_label.setText(self.current_restaurant)
 
 
 if __name__ == "__main__":

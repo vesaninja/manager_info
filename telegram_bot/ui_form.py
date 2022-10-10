@@ -60,6 +60,20 @@ class Ui_InfoScreen(object):
         font.setPointSize(30)
         self.Timetable2.setFont(font)
 
+        self.Restaurant = QLabel(InfoScreen)
+        self.Restaurant.setObjectName(u"Restaurant")
+        self.Restaurant.setGeometry(QRect(290, 125, 300, 200))
+        font = QFont()
+        font.setPointSize(45)
+        self.Restaurant.setFont(font)
+
+        self.FoodMenu = QLabel(InfoScreen)
+        self.FoodMenu.setObjectName(u"FoodMenu")
+        self.FoodMenu.setGeometry(QRect(90, 300, 500, 700))
+        font = QFont()
+        font.setPointSize(15)
+        self.FoodMenu.setFont(font)
+
         self.NowPlaying = QLabel(InfoScreen)
         self.NowPlaying.setObjectName(u"NowPlaying")
         self.NowPlaying.setGeometry(QRect(80, 930, 1000, 50))
@@ -70,7 +84,7 @@ class Ui_InfoScreen(object):
 
         self.ProgressBar = QProgressBar(InfoScreen)
         self.ProgressBar.setObjectName(u"ProgressBar")
-        self.ProgressBar.setGeometry(QRect(0, 920, 1080, 50))
+        self.ProgressBar.setGeometry(QRect(0, 920, 1088, 50))
 
         self.Clock.raise_()
         self.SpotifyCode.raise_()
