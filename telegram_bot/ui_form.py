@@ -38,7 +38,7 @@ class Ui_InfoScreen(object):
 
         self.SpotifyCode = QLabel(InfoScreen)
         self.SpotifyCode.setObjectName(u"SpotifyCode")
-        self.SpotifyCode.setGeometry(QRect(1600, 10, 200, 100))
+        self.SpotifyCode.setGeometry(QRect(1600, 10, 300, 100))
         spotify_font = QFont()
         spotify_font.setPointSize(50)
         spotify_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 15)

@@ -118,14 +118,19 @@ class InfoScreen(QWidget):
 
     def update_timetable(self):
         """ Update the bus information. """
-        buses = self.nysse_api.get_stop_info("3735")
+        try:
+            buses = self.nysse_api.get_stop_info("3735")
+        except:
+            buses = None
         self.timetable1.clear()
         if buses:
             for bus in buses[0:4]:
                 string = "{} - {}".format(bus[0], bus[1])
                 self.timetable1.addItem(string)
-
-        trams = self.nysse_api.get_stop_info("0833")
+        try:
+            trams = self.nysse_api.get_stop_info("0833")
+        except:
+            trams = None
         self.timetable2.clear()
         if trams:
             for tram in trams[0:2]:
@@ -137,7 +142,7 @@ class InfoScreen(QWidget):
         progressbar = self.findChild(QProgressBar, "ProgressBar")
         progressbar.setValue(0)
         progressbar.setTextVisible(False)
-        self.setStyleSheet("QProgressBar { min-height: 3px; max-height: 3px; border-radius: 6px; border-radius: 6px;"
+        self.setStyleSheet("QProgressBar { min-height: 5px; max-height: 5px; border-radius: 6px; border-radius: 6px;"
                            " background-color: transparent}"
                            "QProgressBar::chunk { background-color: white; width: 1px}")
         return progressbar
@@ -178,18 +183,21 @@ class InfoScreen(QWidget):
 
     def update_foodmenu(self):
         """ Update the restauran menu information. """
-        if self.current_restaurant == "HERTSI":
-            menu = get_newton_menu()
-            self.current_restaurant = "NEWTON"
-        elif self.current_restaurant == "NEWTON":
-            menu = get_reaktori_menu()
-            self.current_restaurant = "REAKTORI"
-        elif self.current_restaurant == "REAKTORI":
-            menu = get_hertsi_menu()
-            self.current_restaurant = "HERTSI"
-        formated_menu = ""
-        for line in menu.splitlines():
-            formated_menu += "{}<br>".format(line)
+        try:
+            if self.current_restaurant == "HERTSI":
+                menu = get_newton_menu()
+                self.current_restaurant = "NEWTON"
+            elif self.current_restaurant == "NEWTON":
+                menu = get_reaktori_menu()
+                self.current_restaurant = "REAKTORI"
+            elif self.current_restaurant == "REAKTORI":
+                menu = get_hertsi_menu()
+                self.current_restaurant = "HERTSI"
+            formated_menu = ""
+            for line in menu.splitlines():
+                formated_menu += "{}<br>".format(line)
+        except:
+            formated_menu = "Oops minulla on ongelma!"
         self.food_menu.setText(formated_menu)
         self.restaurant_label.setText(self.current_restaurant)
 
